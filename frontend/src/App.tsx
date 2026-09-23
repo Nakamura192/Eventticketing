@@ -1,13 +1,29 @@
 import { useEffect, useState } from "react";
 import { getWalletClient } from "./config";
-import { formatEther } from "viem";
+import {
+  encodePacked,
+  formatEther,
+  keccak256,
+  parseEther,
+} from "viem";
 import { publicClient, CONTRACT_ADDRESS } from "./config";
 import { EventTicketingAbi } from "./abi/EventTicketingAbi";
 
 function App() {
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
- const [myTickets, setMyTickets] = useState<any[]>([]);
+  const [myTickets, setMyTickets] = useState<any[]>([]);
+  const [eventName, setEventName] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
+  const [eventVenue, setEventVenue] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [ticketPrice, setTicketPrice] = useState("");
+  const [maxTickets, setMaxTickets] = useState("");
+  const [redemptionSignature, setRedemptionSignature] =
+  useState<`0x${string}` | null>(null);
+
+  const [redemptionDeadline, setRedemptionDeadline] =
+    useState<bigint | null>(null);
 
   async function connectWallet() {
     try {
@@ -24,6 +40,73 @@ function App() {
       console.error("Wallet connection failed:", error);
     }
   }
+  async function createEvent() {
+  try {
+    if (!account) {
+      alert("Please connect your wallet.");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch your wallet to Sepolia.");
+      return;
+    }
+
+    if (
+      !eventName ||
+      !eventDescription ||
+      !eventVenue ||
+      !eventDate ||
+      !ticketPrice ||
+      !maxTickets
+    ) {
+      alert("Please fill in all fields.");
+      return;
+    }
+
+    const walletClient = getWalletClient();
+
+    const timestamp = BigInt(
+      Math.floor(new Date(eventDate).getTime() / 1000)
+    );
+
+    const priceInWei = parseEther(ticketPrice);
+
+    const hash = await walletClient.writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "createEvent",
+      args: [
+        eventName,
+        eventDescription,
+        eventVenue,
+        timestamp,
+        priceInWei,
+        BigInt(maxTickets),
+      ],
+      account: account as `0x${string}`,
+    });
+
+    console.log("Create event transaction:", hash);
+
+    alert("Event creation submitted. Waiting for confirmation...");
+
+    await publicClient.waitForTransactionReceipt({ hash });
+
+    alert("Event created successfully!");
+
+    setEventName("");
+    setEventDescription("");
+    setEventVenue("");
+    setEventDate("");
+    setTicketPrice("");
+    setMaxTickets("");
+
+  } catch (error) {
+    console.error("Create event failed:", error);
+    alert("Failed to create event. Check the console.");
+  }
+}
   async function buyTicket(eventId: bigint, ticketPrice: bigint) {
   try {
     if (!account) {
@@ -109,10 +192,18 @@ function App() {
 
         console.log("Event data:", eventData);
 
-        ownedTickets.push({
-          ticketId: i,
-          event: eventData,
-        });
+    const redeemed = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "ticketRedeemed",
+      args: [i],
+    });
+
+    ownedTickets.push({
+      ticketId: i,
+      event: eventData,
+      redeemed,
+    });
       }
     }
 
@@ -187,10 +278,233 @@ function App() {
 
     loadEvents();
   }, []);
+  async function generateRedemptionSignature(
+  ticketId: bigint,
+  deadline: bigint
+) {
+  try {
+    if (!account) {
+      throw new Error("Wallet not connected");
+    }
+
+    if (chainId !== 11155111) {
+      throw new Error("Please switch to Sepolia");
+    }
+
+    const walletClient = getWalletClient();
+
+    const nonce = await publicClient.readContract({
+  address: CONTRACT_ADDRESS,
+  abi: EventTicketingAbi,
+  functionName: "redemptionNonce",
+  args: [ticketId],
+});
+
+console.log("Redemption nonce:", nonce.toString());
+
+const messageHash = keccak256(
+  encodePacked(
+    ["address", "uint256", "uint256", "uint256", "uint256"],
+    [
+      CONTRACT_ADDRESS,
+      BigInt(chainId),
+      ticketId,
+      deadline,
+      nonce,
+    ]
+  )
+);
+
+    console.log("Message hash:", messageHash);
+
+    const signature = await walletClient.signMessage({
+      account: account as `0x${string}`,
+      message: {
+        raw: messageHash,
+      },
+    });
+
+    console.log("Redemption signature:", signature);
+
+    return signature;
+  } catch (error) {
+    console.error("Signature generation failed:", error);
+    return null;
+  }
+}
+
+async function redeemTicketOnChain(
+  ticketId: bigint,
+  deadline: bigint,
+  signature: `0x${string}`
+) {
+  try {
+    if (!account) {
+      alert("Please connect your wallet.");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch your wallet to Sepolia.");
+      return;
+    }
+
+    const walletClient = getWalletClient();
+
+    const hash = await walletClient.writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "redeemTicket",
+      args: [ticketId, deadline, signature],
+      account: account as `0x${string}`,
+    });
+
+    console.log("Redemption transaction submitted:", hash);
+
+    alert("Redemption transaction submitted. Waiting for confirmation...");
+
+    await publicClient.waitForTransactionReceipt({ hash });
+
+    alert("Ticket redeemed successfully!");
+
+    await loadMyTickets(account);
+  } catch (error) {
+    console.error("Ticket redemption failed:", error);
+    alert("Ticket redemption failed. Check the console.");
+  }
+}
+  async function authorizeStaff(
+  eventId: bigint,
+  staffAddress: `0x${string}`
+) {
+  try {
+    if (!account) {
+      alert("Please connect your wallet.");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch your wallet to Sepolia.");
+      return;
+    }
+
+    const walletClient = getWalletClient();
+
+    const hash = await walletClient.writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "setEventStaff",
+      args: [eventId, staffAddress, true],
+      account: account as `0x${string}`,
+    });
+
+    console.log("Staff authorization transaction:", hash);
+
+    alert("Authorizing staff wallet. Waiting for confirmation...");
+
+    await publicClient.waitForTransactionReceipt({ hash });
+
+    alert("Staff wallet authorized successfully!");
+
+  } catch (error) {
+    console.error("Staff authorization failed:", error);
+    alert("Failed to authorize staff wallet. Check the console.");
+  }
+}
 
   return (
     <div>
+      
       <h1>Event Ticketing DApp</h1>
+            <div>
+      <h2>Create Event</h2>
+
+      <input
+        type="text"
+        placeholder="Event name"
+        value={eventName}
+        onChange={(e) => setEventName(e.target.value)}
+      />
+
+      <input
+        type="text"
+        placeholder="Description"
+        value={eventDescription}
+        onChange={(e) => setEventDescription(e.target.value)}
+      />
+
+      <input
+        type="text"
+        placeholder="Venue"
+        value={eventVenue}
+        onChange={(e) => setEventVenue(e.target.value)}
+      />
+
+      <input
+        type="datetime-local"
+        value={eventDate}
+        onChange={(e) => setEventDate(e.target.value)}
+      />
+
+      <input
+        type="number"
+        placeholder="Ticket price in ETH"
+        value={ticketPrice}
+        onChange={(e) => setTicketPrice(e.target.value)}
+      />
+
+      <input
+        type="number"
+        placeholder="Maximum tickets"
+        value={maxTickets}
+        onChange={(e) => setMaxTickets(e.target.value)}
+      />
+
+      <button onClick={createEvent}>
+        Create Event
+      </button>
+    </div>
+
+    <div>
+  <h2>Authorize Event Staff</h2>
+
+  <input
+    type="number"
+    placeholder="Event ID"
+    id="staff-event-id"
+  />
+
+  <input
+    type="text"
+    placeholder="Staff wallet address"
+    id="staff-address"
+  />
+
+  <button
+    onClick={() => {
+      const eventIdInput = (
+        document.getElementById("staff-event-id") as HTMLInputElement
+      ).value;
+
+      const staffAddressInput = (
+        document.getElementById("staff-address") as HTMLInputElement
+      ).value;
+
+      if (!eventIdInput || !staffAddressInput) {
+        alert("Please enter both Event ID and staff address.");
+        return;
+      }
+
+      authorizeStaff(
+        BigInt(eventIdInput),
+        staffAddressInput as `0x${string}`
+      );
+    }}
+  >
+    Authorize Staff
+  </button>
+</div>
+      
       <button onClick={connectWallet}>
   {account ? "Wallet Connected" : "Connect Wallet"}
 </button>
@@ -245,8 +559,53 @@ function App() {
           </p>
 
           <p>
-            <strong>Status:</strong> Valid
+            <strong>Status:</strong> {ticket.redeemed ? "Redeemed" : "Valid"}
           </p>
+          <div>
+        Event timestamp: {ticket.event[5].toString()}
+      </div>
+
+      <div>
+        Current timestamp: {Math.floor(Date.now() / 1000)}
+      </div>
+          <button
+  onClick={async () => {
+    const deadline = BigInt(
+      Math.floor(Date.now() / 1000) + 3600
+    );
+
+    const signature = await generateRedemptionSignature(
+      ticket.ticketId,
+      deadline
+    );
+
+    if (signature) {
+      setRedemptionSignature(signature);
+      setRedemptionDeadline(deadline);
+    }
+  }}
+>
+  Generate Redemption Signature
+</button>
+
+{!ticket.redeemed && (
+  <button
+    onClick={async () => {
+      if (!redemptionSignature || !redemptionDeadline) {
+        alert("Please generate a redemption signature first.");
+        return;
+      }
+
+      await redeemTicketOnChain(
+        ticket.ticketId,
+        redemptionDeadline,
+        redemptionSignature
+      );
+    }}
+  >
+    Redeem Ticket
+  </button>
+)}
 
           <hr />
         </div>

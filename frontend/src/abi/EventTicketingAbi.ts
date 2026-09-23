@@ -124,4 +124,72 @@ export const EventTicketingAbi = [
     },
   ],
 },
+{
+  type: "function",
+  name: "redeemTicket",
+  stateMutability: "nonpayable",
+  inputs: [
+    {
+      name: "_ticketId",
+      type: "uint256",
+    },
+    {
+      name: "_deadline",
+      type: "uint256",
+    },
+    {
+      name: "_signature",
+      type: "bytes",
+    },
+  ],
+  
+  outputs: [],
+},
+{
+  type: "function",
+  name: "redemptionNonce",
+  stateMutability: "view",
+  inputs: [
+    { name: "", type: "uint256" }
+  ],
+  outputs: [
+    { name: "", type: "uint256" }
+  ],
+},
+{
+  type: "function",
+  name: "ticketRedeemed",
+  stateMutability: "view",
+  inputs: [
+    { name: "", type: "uint256" }
+  ],
+  outputs: [
+    { name: "", type: "bool" }
+  ],
+},
+{
+  type: "function",
+  name: "createEvent",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "_eventName", type: "string" },
+    { name: "_description", type: "string" },
+    { name: "_venue", type: "string" },
+    { name: "_date", type: "uint256" },
+    { name: "_ticketPrice", type: "uint256" },
+    { name: "_maxTickets", type: "uint256" },
+  ],
+  outputs: [],
+},
+  {
+  type: "function",
+  name: "setEventStaff",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "_eventId", type: "uint256" },
+    { name: "_staff", type: "address" },
+    { name: "_authorized", type: "bool" },
+  ],
+  outputs: [],
+},
 ] as const;

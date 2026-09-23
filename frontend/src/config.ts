@@ -2,7 +2,7 @@ import { createPublicClient, createWalletClient, custom, http } from "viem";
 import { sepolia } from "viem/chains";
 
 export const CONTRACT_ADDRESS =
-  "0xA32BC40f61D77ca657DF866C8C3f7662B22BE8e8";
+  "0xEAB79f3F83aAb8A6B43Df47Ba99604Bea1E9A8D0";
 
 export const publicClient = createPublicClient({
   chain: sepolia,
