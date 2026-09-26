@@ -13,6 +13,7 @@ function App() {
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [myTickets, setMyTickets] = useState<any[]>([]);
+  const [myEvents, setMyEvents] = useState<any[]>([]);
   const [eventName, setEventName] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventVenue, setEventVenue] = useState("");
@@ -21,6 +22,9 @@ function App() {
   const [maxTickets, setMaxTickets] = useState("");
   const [redemptionSignature, setRedemptionSignature] =
   useState<`0x${string}` | null>(null);
+  const [staffAddress, setStaffAddress] = useState("");
+ const [staffAuthorized, setStaffAuthorized] = useState<Record<string, boolean>>({});
+  
 
   const [redemptionDeadline, setRedemptionDeadline] =
     useState<bigint | null>(null);
@@ -36,6 +40,7 @@ function App() {
       setChainId(currentChainId);
 
       await loadMyTickets(address);
+      await loadMyEvents(address);
     } catch (error) {
       console.error("Wallet connection failed:", error);
     }
@@ -212,20 +217,59 @@ function App() {
     console.error("FAILED TO LOAD MY TICKETS:", error);
   }
 }
+
+  async function loadMyEvents(address: string) {
+  try {
+    const count = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "eventCount",
+    });
+
+    const organizerEvents = [];
+
+    for (let i = 1n; i <= count; i++) {
+      const eventData = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: EventTicketingAbi,
+        functionName: "events",
+        args: [i],
+      });
+
+      if (eventData[1].toLowerCase() === address.toLowerCase()) {
+        organizerEvents.push({
+          eventId: i,
+          event: eventData,
+        });
+      }
+    }
+    console.log("My organizer events:", organizerEvents);
+    setMyEvents(organizerEvents);
+    
+  } catch (error) {
+    console.error("Failed to load organizer events:", error);
+  }
+}
   useEffect(() => {
     if (!window.ethereum) return;
 
-    const handleAccountsChanged = (accounts: unknown) => {
-      const addresses = accounts as string[];
+   const handleAccountsChanged = async (accounts: unknown) => {
+  const addresses = accounts as string[];
 
-      if (addresses.length === 0) {
-        setAccount(null);
-        setChainId(null);
-      } else {
-        setAccount(addresses[0]);
-      }
-    };
+  if (addresses.length === 0) {
+    setAccount(null);
+    setChainId(null);
+    setMyEvents([]);
+    setMyTickets([]);
+  } else {
+    const newAddress = addresses[0];
 
+    setAccount(newAddress);
+
+    await loadMyTickets(newAddress);
+    await loadMyEvents(newAddress);
+  }
+};
     const handleChainChanged = (chainIdHex: unknown) => {
       const newChainId = Number(chainIdHex);
 
@@ -406,9 +450,110 @@ async function redeemTicketOnChain(
 
     alert("Staff wallet authorized successfully!");
 
+    const authorized = await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: EventTicketingAbi,
+    functionName: "eventStaff",
+    args: [eventId, staffAddress],
+  });
+
+  console.log("Staff authorization status:", authorized);
+  setStaffAuthorized((prev) => ({
+  ...prev,
+  [eventId.toString()]: authorized,
+}));
+
   } catch (error) {
     console.error("Staff authorization failed:", error);
     alert("Failed to authorize staff wallet. Check the console.");
+  }
+}
+
+async function revokeStaff(
+  eventId: bigint,
+  staffAddress: `0x${string}`
+) {
+  try {
+    if (!account) {
+      alert("Please connect your wallet.");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch your wallet to Sepolia.");
+      return;
+    }
+
+    const walletClient = getWalletClient();
+
+    const hash = await walletClient.writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "setEventStaff",
+      args: [eventId, staffAddress, false],
+      account: account as `0x${string}`,
+    });
+
+    console.log("Staff revocation transaction:", hash);
+
+    alert("Revoking staff authorization. Waiting for confirmation...");
+
+    await publicClient.waitForTransactionReceipt({ hash });
+
+    alert("Staff authorization revoked successfully!");
+
+    const authorized = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "eventStaff",
+      args: [eventId, staffAddress],
+    });
+
+    console.log("Staff authorization status:", authorized);
+
+    setStaffAuthorized((prev) => ({
+      ...prev,
+      [eventId.toString()]: authorized,
+    }));
+  } catch (error) {
+    console.error("Staff revocation failed:", error);
+    alert("Failed to revoke staff authorization. Check the console.");
+  }
+}
+    async function cancelEvent(eventId: bigint) {
+  try {
+    if (!account) {
+      alert("Please connect your wallet.");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch your wallet to Sepolia.");
+      return;
+    }
+
+    const walletClient = getWalletClient();
+
+    const hash = await walletClient.writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "cancelEvent",
+      args: [eventId],
+      account: account as `0x${string}`,
+    });
+
+    console.log("Cancel event transaction:", hash);
+
+    alert("Cancelling event. Waiting for confirmation...");
+
+    await publicClient.waitForTransactionReceipt({ hash });
+
+    alert("Event cancelled successfully!");
+
+    await loadMyEvents(account);
+  } catch (error) {
+    console.error("Cancel event failed:", error);
+    alert("Failed to cancel event. Check the console.");
   }
 }
 
@@ -465,45 +610,7 @@ async function redeemTicketOnChain(
       </button>
     </div>
 
-    <div>
-  <h2>Authorize Event Staff</h2>
-
-  <input
-    type="number"
-    placeholder="Event ID"
-    id="staff-event-id"
-  />
-
-  <input
-    type="text"
-    placeholder="Staff wallet address"
-    id="staff-address"
-  />
-
-  <button
-    onClick={() => {
-      const eventIdInput = (
-        document.getElementById("staff-event-id") as HTMLInputElement
-      ).value;
-
-      const staffAddressInput = (
-        document.getElementById("staff-address") as HTMLInputElement
-      ).value;
-
-      if (!eventIdInput || !staffAddressInput) {
-        alert("Please enter both Event ID and staff address.");
-        return;
-      }
-
-      authorizeStaff(
-        BigInt(eventIdInput),
-        staffAddressInput as `0x${string}`
-      );
-    }}
-  >
-    Authorize Staff
-  </button>
-</div>
+    
       
       <button onClick={connectWallet}>
   {account ? "Wallet Connected" : "Connect Wallet"}
@@ -522,6 +629,155 @@ async function redeemTicketOnChain(
       : `Unknown Network (${chainId})`}
   </p>
 )}
+
+  <div>
+  <h2>Organizer Dashboard</h2>
+
+  {myEvents.length === 0 ? (
+  <p>You have not created any events.</p>
+) : (
+  myEvents.map((item) => {
+    const ticketsSold = Number(item.event[8]);
+    const maxTickets = Number(item.event[7]);
+    const salesPercentage =
+      maxTickets > 0 ? (ticketsSold / maxTickets) * 100 : 0;
+
+    return (
+      <div key={item.eventId.toString()}>
+        <h3>{item.event[2]}</h3>
+
+        <p>
+          <strong>Venue:</strong> {item.event[4]}
+        </p>
+
+        <p>
+          <strong>Date:</strong>{" "}
+          {new Date(Number(item.event[5]) * 1000).toLocaleString()}
+        </p>
+
+        <p>
+          <strong>Tickets Sold:</strong>{" "}
+          {item.event[8].toString()} / {item.event[7].toString()}
+        </p>
+
+        <p>
+          <strong>Tickets Remaining:</strong>{" "}
+          {(item.event[7] - item.event[8]).toString()}
+        </p>
+
+        <p>
+          <strong>Sales:</strong>{" "}
+          {salesPercentage.toFixed(1)}%
+        </p>
+
+        <div
+          style={{
+            width: "100%",
+            height: "10px",
+            backgroundColor: "#e0e0e0",
+            borderRadius: "5px",
+            overflow: "hidden",
+            marginTop: "5px",
+            marginBottom: "15px",
+          }}
+        >
+          <div
+            style={{
+              width: `${Math.min(salesPercentage, 100)}%`,
+              height: "100%",
+              backgroundColor: "#4caf50",
+            }}
+          />
+        </div>
+
+        <p>
+          <strong>Revenue:</strong>{" "}
+          {formatEther(item.event[6] * item.event[8])} ETH
+        </p>
+
+        <p>
+          <strong>Status:</strong>{" "}
+          {item.event[9] ? "Active" : "Cancelled"}
+        </p>
+
+        {item.event[9] && (
+          <>
+            <input
+              type="text"
+              placeholder="Staff wallet address"
+              value={staffAddress}
+              onChange={(e) => setStaffAddress(e.target.value)}
+            />
+
+            <button
+              onClick={() => {
+                if (!staffAddress) {
+                  alert("Please enter a staff wallet address.");
+                  return;
+                }
+
+                authorizeStaff(
+                  item.eventId,
+                  staffAddress as `0x${string}`
+                );
+              }}
+            >
+              Authorize Staff
+            </button>
+
+            {staffAuthorized[item.eventId.toString()] && (
+              <button
+                onClick={() => {
+                  if (!staffAddress) {
+                    alert("Please enter the staff wallet address.");
+                    return;
+                  }
+
+                  const confirmed = window.confirm(
+                    "Are you sure you want to revoke this staff member's authorization?"
+                  );
+
+                  if (confirmed) {
+                    revokeStaff(
+                      item.eventId,
+                      staffAddress as `0x${string}`
+                    );
+                  }
+                }}
+              >
+                Revoke Staff
+              </button>
+            )}
+
+            <p>
+              <strong>Staff Status:</strong>{" "}
+              {staffAuthorized[item.eventId.toString()]
+                ? "Authorized"
+                : "Not Authorized"}
+            </p>
+          </>
+        )}
+
+        {item.event[9] && (
+          <button
+            onClick={() => {
+              const confirmed = window.confirm(
+                "Are you sure you want to cancel this event?"
+              );
+
+              if (confirmed) {
+                cancelEvent(item.eventId);
+              }
+            }}
+          >
+            Cancel Event
+          </button>
+        )}
+      </div>
+    );
+  })
+)}
+</div>
 
 {account && (
   <div>
@@ -642,7 +898,6 @@ async function redeemTicketOnChain(
             <strong>Tickets:</strong>{" "}
             {event[8].toString()} / {event[7].toString()}
           </p>
-
           <p>
             <strong>Active:</strong>{" "}
             {event[9] ? "Yes" : "No"}

@@ -192,4 +192,23 @@ export const EventTicketingAbi = [
   ],
   outputs: [],
 },
+{
+  type: "function",
+  name: "eventStaff",
+  stateMutability: "view",
+  inputs: [
+    { name: "", type: "uint256" },
+    { name: "", type: "address" },
+  ],
+  outputs: [{ name: "", type: "bool" }],
+},
+{
+  type: "function",
+  name: "cancelEvent",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "_eventId", type: "uint256" }
+  ],
+  outputs: [],
+},
 ] as const;
