@@ -1059,17 +1059,22 @@ async function revokeStaff(
       </p>
 
       <p>
-        <strong>Status:</strong>{" "}
-        {redemptionPreview.redeemed
-          ? "Already Redeemed"
-          : "Valid"}
-      </p>
+      <strong>Ticket Status:</strong>{" "}
+      {redemptionPreview.redeemed
+        ? "Already Redeemed"
+        : "Not Redeemed"}
+    </p>
 
       <p>
         <strong>Authorization:</strong>{" "}
         {redemptionPreview.expired
           ? "Expired"
           : "Not Expired"}
+      </p>
+
+      <p>
+        <strong>Signature:</strong>{" "}
+        Verified on-chain during redemption
       </p>
 
       <p>
