@@ -78,14 +78,26 @@ function App() {
 
           const [ticketId, deadline, signature] = parts;
 
-          if (
-            !ticketId ||
-            !deadline ||
-            !signature ||
-            !signature.startsWith("0x")
-          ) {
-            throw new Error("Invalid redemption authorization");
-          }
+         if (
+          !ticketId ||
+          !deadline ||
+          !signature ||
+          !signature.startsWith("0x")
+        ) {
+          throw new Error("Invalid redemption authorization");
+        }
+
+        if (!/^\d+$/.test(ticketId)) {
+          throw new Error("Invalid ticket ID");
+        }
+
+        if (!/^\d+$/.test(deadline)) {
+          throw new Error("Invalid authorization deadline");
+        }
+
+        if (!/^0x[a-fA-F0-9]{130}$/.test(signature)) {
+          throw new Error("Invalid Ethereum signature");
+        }
 
           const authorization = JSON.stringify({
             ticketId,
@@ -742,9 +754,16 @@ async function redeemTicketOnChain(
     alert("Ticket redeemed successfully!");
 
     await loadMyTickets(account);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Ticket redemption failed:", error);
-    alert("Ticket redemption failed. Check the console.");
+
+    const message =
+      error?.shortMessage ||
+      error?.details ||
+      error?.message ||
+      "Unknown error";
+
+    alert(`Ticket redemption failed:\n\n${message}`);
   }
 }
   async function authorizeStaff(
