@@ -8,26 +8,123 @@ import {
 } from "viem";
 import { publicClient, CONTRACT_ADDRESS } from "./config";
 import { EventTicketingAbi } from "./abi/EventTicketingAbi";
+import { QRCodeSVG } from "qrcode.react";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 function App() {
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [myTickets, setMyTickets] = useState<any[]>([]);
   const [myEvents, setMyEvents] = useState<any[]>([]);
+  const [eventTickets, setEventTickets] = useState<any[]>([]);
   const [eventName, setEventName] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventVenue, setEventVenue] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [ticketPrice, setTicketPrice] = useState("");
   const [maxTickets, setMaxTickets] = useState("");
-  const [redemptionSignature, setRedemptionSignature] =
-  useState<`0x${string}` | null>(null);
   const [staffAddress, setStaffAddress] = useState("");
- const [staffAuthorized, setStaffAuthorized] = useState<Record<string, boolean>>({});
+  const [staffAuthorized, setStaffAuthorized] = useState<Record<string, boolean>>({});
   
+  const [ticketRedemptionData, setTicketRedemptionData] = useState<
+    Record<
+      string,
+      {
+        signature: `0x${string}`;
+        deadline: bigint;
+      }
+    >
+  >({});
+  const [redemptionInput, setRedemptionInput] = useState("");
+  const [redemptionLoading, setRedemptionLoading] = useState(false);
+  const [scannerActive, setScannerActive] = useState(false);
+  const [redemptionPreview, setRedemptionPreview] = useState<{
+  ticketId: bigint;
+  owner: string;
+  eventName: string;
+  redeemed: boolean;
+  deadline: bigint;
+  expired: boolean;
+  authorized: boolean;
+} | null>(null);
 
-  const [redemptionDeadline, setRedemptionDeadline] =
-    useState<bigint | null>(null);
+ 
+
+  useEffect(() => {
+    if (!scannerActive) {
+      return;
+    }
+
+    const scanner = new Html5QrcodeScanner(
+      "qr-reader",
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+      },
+      false
+    );
+
+    scanner.render(
+      (decodedText) => {
+        console.log("QR code scanned:", decodedText);
+
+        try {
+          const parts = decodedText.split("|");
+
+          if (parts.length !== 3) {
+            throw new Error("Invalid redemption QR format");
+          }
+
+          const [ticketId, deadline, signature] = parts;
+
+          if (
+            !ticketId ||
+            !deadline ||
+            !signature ||
+            !signature.startsWith("0x")
+          ) {
+            throw new Error("Invalid redemption authorization");
+          }
+
+          const authorization = JSON.stringify({
+            ticketId,
+            deadline,
+            signature,
+          });
+
+          console.log(
+            "Converted QR authorization:",
+            authorization
+          );
+
+          setRedemptionInput(authorization);
+          setRedemptionPreview(null);
+          setScannerActive(false);
+
+          scanner.clear().catch((error) => {
+            console.error("Failed to stop QR scanner:", error);
+          });
+        } catch (error) {
+          console.error("QR authorization processing failed:", error);
+
+          alert(
+            "Invalid redemption QR code. Please scan a valid ticket authorization."
+          );
+        }
+      },
+      (errorMessage) => {
+        // Ignore continuous "QR code not found" messages.
+      }
+    );
+
+    return () => {
+      scanner.clear().catch((error) => {
+        console.error("Failed to clean up QR scanner:", error);
+      });
+    };
+  }, [scannerActive]);
+
+
 
   async function connectWallet() {
     try {
@@ -243,11 +340,70 @@ function App() {
         });
       }
     }
-    console.log("My organizer events:", organizerEvents);
+   console.log("My organizer events:", organizerEvents);
+
     setMyEvents(organizerEvents);
+
+    await loadEventTickets(organizerEvents);
     
   } catch (error) {
     console.error("Failed to load organizer events:", error);
+  }
+}
+
+async function loadEventTickets(events: any[]) {
+  try {
+    const count = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "ticketCount",
+    });
+
+    const organizerTickets = [];
+
+    for (let i = 1n; i <= count; i++) {
+      const eventId = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: EventTicketingAbi,
+        functionName: "ticketEvent",
+        args: [i],
+      });
+
+      const matchingEvent = events.find(
+        (item) => item.eventId === eventId
+      );
+
+      if (!matchingEvent) {
+        continue;
+      }
+
+      const owner = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: EventTicketingAbi,
+        functionName: "ownerOf",
+        args: [i],
+      });
+
+      const redeemed = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: EventTicketingAbi,
+        functionName: "ticketRedeemed",
+        args: [i],
+      });
+
+      organizerTickets.push({
+        ticketId: i,
+        eventId,
+        owner,
+        redeemed,
+      });
+    }
+
+    console.log("Organizer tickets:", organizerTickets);
+
+    setEventTickets(organizerTickets);
+  } catch (error) {
+    console.error("Failed to load organizer tickets:", error);
   }
 }
   useEffect(() => {
@@ -294,6 +450,7 @@ function App() {
   const [eventCount, setEventCount] = useState<bigint | null>(null);
   const [events, setEvents] = useState<any[]>([]);
 
+  
   useEffect(() => {
     async function loadEvents() {
       const count = await publicClient.readContract({
@@ -333,6 +490,19 @@ function App() {
 
     if (chainId !== 11155111) {
       throw new Error("Please switch to Sepolia");
+    }
+    
+    const ticketOwner = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "ownerOf",
+      args: [ticketId],
+    });
+
+    if (ticketOwner.toLowerCase() !== account.toLowerCase()) {
+      throw new Error(
+        "Only the current ticket owner can sign the redemption authorization."
+      );
     }
 
     const walletClient = getWalletClient();
@@ -374,6 +544,150 @@ const messageHash = keccak256(
   } catch (error) {
     console.error("Signature generation failed:", error);
     return null;
+  }
+}
+
+async function handleRedemptionInput() {
+  try {
+    if (!account) {
+      alert("Please connect your wallet.");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch your wallet to Sepolia.");
+      return;
+    }
+
+    if (!redemptionInput.trim()) {
+      alert("Please paste a redemption authorization.");
+      return;
+    }
+
+    const data = JSON.parse(redemptionInput);
+
+    if (
+      !data.ticketId ||
+      !data.deadline ||
+      !data.signature
+    ) {
+      alert(
+        "Invalid authorization. Ticket ID, deadline, and signature are required."
+      );
+      return;
+    }
+
+    setRedemptionLoading(true);
+
+    await redeemTicketOnChain(
+      BigInt(data.ticketId),
+      BigInt(data.deadline),
+      data.signature as `0x${string}`
+    );
+
+    setRedemptionInput("");
+  } catch (error) {
+    console.error("Redemption authorization processing failed:", error);
+    alert(
+      "Invalid redemption authorization. Make sure you pasted the complete authorization."
+    );
+  } finally {
+    setRedemptionLoading(false);
+  }
+}
+
+async function previewRedemptionAuthorization() {
+  try {
+    if (!redemptionInput.trim()) {
+      alert("Please paste a redemption authorization.");
+      return;
+    }
+
+    const data = JSON.parse(redemptionInput);
+
+    if (
+      !data.ticketId ||
+      !data.deadline ||
+      !data.signature
+    ) {
+      alert(
+        "Invalid authorization. Ticket ID, deadline, and signature are required."
+      );
+      return;
+    }
+
+    const ticketId = BigInt(data.ticketId);
+    const deadline = BigInt(data.deadline);
+
+    const owner = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "ownerOf",
+      args: [ticketId],
+    });
+
+    const eventId = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "ticketEvent",
+      args: [ticketId],
+    });
+
+    const eventData = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "events",
+      args: [eventId],
+    });
+
+    const currentTime = BigInt(
+      Math.floor(Date.now() / 1000)
+    );
+
+    const expired = currentTime > deadline;
+
+    const organizer = eventData[1];
+
+    const isOrganizer =
+      !!account &&
+      organizer.toLowerCase() === account.toLowerCase();
+
+    const isStaff = !!account
+      ? await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: EventTicketingAbi,
+          functionName: "eventStaff",
+          args: [eventId, account as `0x${string}`],
+        })
+      : false;
+
+    const authorized = isOrganizer || isStaff;
+
+    const redeemed = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "ticketRedeemed",
+      args: [ticketId],
+    });
+
+    setRedemptionPreview({
+      ticketId,
+      owner,
+      eventName: eventData[2],
+      redeemed,
+      deadline,
+      expired,
+      authorized,
+    });
+
+  } catch (error) {
+    console.error("Authorization preview failed:", error);
+
+    setRedemptionPreview(null);
+
+    alert(
+      "Unable setRedto preview authorization. Make sure the authorization is valid."
+    );
   }
 }
 
@@ -632,6 +946,127 @@ async function revokeStaff(
 
   <div>
   <h2>Organizer Dashboard</h2>
+ 
+    <h2>Ticket Redemption</h2>
+
+  <p>
+    Paste the redemption authorization provided by the ticket owner.
+  </p>
+ 
+  <button
+    onClick={() => setScannerActive(true)}
+  >
+    Scan QR Code
+  </button>
+
+  {scannerActive && (
+    <div style={{ marginTop: "15px", maxWidth: "500px" }}>
+      <div id="qr-reader"></div>
+
+      <button
+        onClick={() => setScannerActive(false)}
+        style={{ marginTop: "10px" }}
+      >
+        Stop Scanner
+      </button>
+    </div>
+  )}
+
+  <textarea
+    placeholder="Paste redemption authorization here..."
+    value={redemptionInput}
+    onChange={(e) => {
+      setRedemptionInput(e.target.value);
+      setRedemptionPreview(null);
+    }}
+    rows={5}
+    style={{
+      width: "100%",
+      maxWidth: "600px",
+      marginBottom: "10px",
+    }}
+  />
+
+  <br />
+
+  <button
+    onClick={previewRedemptionAuthorization}
+  >
+    Preview Authorization
+  </button>
+
+  {redemptionPreview && (
+    <div
+      style={{
+        marginTop: "20px",
+        padding: "15px",
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        maxWidth: "600px",
+      }}
+    >
+      <h3>Authorization Preview</h3>
+
+      <p>
+        <strong>Ticket:</strong>{" "}
+        #{redemptionPreview.ticketId.toString()}
+      </p>
+
+      <p>
+        <strong>Owner:</strong>{" "}
+        {redemptionPreview.owner.slice(0, 6)}...
+        {redemptionPreview.owner.slice(-4)}
+      </p>
+
+      <p>
+        <strong>Event:</strong>{" "}
+        {redemptionPreview.eventName}
+      </p>
+
+      <p>
+        <strong>Status:</strong>{" "}
+        {redemptionPreview.redeemed
+          ? "Already Redeemed"
+          : "Valid"}
+      </p>
+
+      <p>
+        <strong>Authorization:</strong>{" "}
+        {redemptionPreview.expired
+          ? "Expired"
+          : "Not Expired"}
+      </p>
+
+      <p>
+        <strong>Your Access:</strong>{" "}
+        {redemptionPreview.authorized
+          ? "Authorized"
+          : "Not Authorized"}
+      </p>
+
+      <p>
+        <strong>Authorization Expires:</strong>{" "}
+        {new Date(
+          Number(redemptionPreview.deadline) * 1000
+        ).toLocaleString()}
+      </p>
+    </div>
+  )}
+
+ <button
+    onClick={handleRedemptionInput}
+    disabled={
+      redemptionLoading ||
+      !redemptionPreview ||
+      redemptionPreview.expired ||
+      redemptionPreview.redeemed ||
+      !redemptionPreview.authorized
+    }
+  >
+    {redemptionLoading
+      ? "Redeeming..."
+      : "Redeem Ticket"}
+  </button>
 
   {myEvents.length === 0 ? (
   <p>You have not created any events.</p>
@@ -773,7 +1208,48 @@ async function revokeStaff(
             Cancel Event
           </button>
         )}
-      </div>
+        {eventTickets.filter(
+          (ticket) => ticket.eventId === item.eventId
+        ).length > 0 && (
+          <div>
+            <h4>Tickets</h4>
+
+            <p>
+              <strong>Tickets Issued:</strong>{" "}
+              {eventTickets.filter(
+                (ticket) => ticket.eventId === item.eventId
+              ).length}{" "}
+              / {item.event[7].toString()}
+            </p>
+            {eventTickets
+              .filter((ticket) => ticket.eventId === item.eventId)
+              .map((ticket) => (
+                <div key={ticket.ticketId.toString()}>
+                  <p>
+                    <strong>Ticket #{ticket.ticketId.toString()}</strong>
+                  </p>
+
+                  <p>
+                  <strong>Owner:</strong>{" "}
+                  {ticket.owner.slice(0, 6)}...
+                  {ticket.owner.slice(-4)}
+                </p>
+
+                  <p>
+                    <strong>Status:</strong>{" "}
+                    {ticket.redeemed ? "Redeemed" : "Valid"}
+                  </p>
+
+                  {ticket.redeemed && (
+                    <p>
+                      <strong>Check-in:</strong> Completed
+                    </p>
+                  )}
+                </div>
+              ))}
+          </div>
+        )}
+              </div>
     );
   })
 )}
@@ -825,37 +1301,95 @@ async function revokeStaff(
         Current timestamp: {Math.floor(Date.now() / 1000)}
       </div>
           <button
-  onClick={async () => {
-    const deadline = BigInt(
-      Math.floor(Date.now() / 1000) + 3600
-    );
+            onClick={async () => {
+              const deadline = BigInt(
+                Math.floor(Date.now() / 1000) + 3600
+              );
 
-    const signature = await generateRedemptionSignature(
-      ticket.ticketId,
-      deadline
-    );
+              const signature = await generateRedemptionSignature(
+                ticket.ticketId,
+                deadline
+              );
 
-    if (signature) {
-      setRedemptionSignature(signature);
-      setRedemptionDeadline(deadline);
-    }
-  }}
->
-  Generate Redemption Signature
-</button>
+              if (signature) {
+                setTicketRedemptionData((prev) => ({
+                  ...prev,
+                  [ticket.ticketId.toString()]: {
+                    signature,
+                    deadline,
+                  },
+                }));
+              }
+            }}
+          >
+            Sign Redemption Authorization
+          </button>
+        
+          {ticketRedemptionData[ticket.ticketId.toString()] && (
+  <button
+    onClick={async () => {
+      const redemptionData =
+        ticketRedemptionData[ticket.ticketId.toString()];
+
+      const authorization = JSON.stringify({
+        ticketId: ticket.ticketId.toString(),
+        deadline: redemptionData.deadline.toString(),
+        signature: redemptionData.signature,
+      });
+
+      await navigator.clipboard.writeText(authorization);
+
+      alert("Redemption authorization copied to clipboard!");
+    }}
+  >
+    Copy Redemption Authorization
+  </button>
+)}
+
+    {ticketRedemptionData[ticket.ticketId.toString()] && (
+      <div style={{ marginTop: "15px" }}>
+        <h4>Redemption QR Code</h4>
+
+        {ticketRedemptionData[ticket.ticketId.toString()] &&
+          (() => {
+            const authorization = [
+              ticket.ticketId.toString(),
+              ticketRedemptionData[ticket.ticketId.toString()].deadline.toString(),
+              ticketRedemptionData[ticket.ticketId.toString()].signature,
+            ].join("|");
+            console.log("QR Authorization Payload:", authorization);
+            console.log("QR Payload Length:", authorization.length);
+            console.log("QR Payload Ends With:", authorization.slice(-20));
+
+            return (
+              <QRCodeSVG
+                value={authorization}
+                size={400}
+              />
+            );
+          })()}
+
+        <p>
+          Show this QR code to event staff for ticket redemption.
+        </p>
+      </div>
+    )}
 
 {!ticket.redeemed && (
   <button
     onClick={async () => {
-      if (!redemptionSignature || !redemptionDeadline) {
+      const redemptionData =
+        ticketRedemptionData[ticket.ticketId.toString()];
+
+      if (!redemptionData) {
         alert("Please generate a redemption signature first.");
         return;
       }
 
       await redeemTicketOnChain(
         ticket.ticketId,
-        redemptionDeadline,
-        redemptionSignature
+        redemptionData.deadline,
+        redemptionData.signature
       );
     }}
   >
