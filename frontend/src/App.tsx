@@ -38,6 +38,7 @@ function App() {
   const [redemptionInput, setRedemptionInput] = useState("");
   const [redemptionLoading, setRedemptionLoading] = useState(false);
   const [scannerActive, setScannerActive] = useState(false);
+  const [autoPreview, setAutoPreview] = useState(false);
   const [redemptionPreview, setRedemptionPreview] = useState<{
   ticketId: bigint;
   owner: string;
@@ -99,6 +100,7 @@ function App() {
 
           setRedemptionInput(authorization);
           setRedemptionPreview(null);
+          setAutoPreview(true);
           setScannerActive(false);
 
           scanner.clear().catch((error) => {
@@ -123,6 +125,20 @@ function App() {
       });
     };
   }, [scannerActive]);
+
+  useEffect(() => {
+  if (!autoPreview) {
+    return;
+  }
+
+  if (!redemptionInput) {
+    return;
+  }
+
+  setAutoPreview(false);
+
+  previewRedemptionAuthorization();
+}, [autoPreview, redemptionInput]);
 
 
 
