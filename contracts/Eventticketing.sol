@@ -41,6 +41,8 @@ constructor() ERC721 ("EventTicket", "EVT") {}
    error InvalidTicketPrice();
    error InvalidTicketSupply();
    error EventDoesNotExist();
+   error EventAlreadyCancelled();
+   error CheckInNotOpen();
    error NotOrganizer();
    error EventNotActive();
    error EventSoldOut();
@@ -77,6 +79,14 @@ constructor() ERC721 ("EventTicket", "EVT") {}
     uint256 indexed ticketId,
     uint256 indexed eventId,
     address indexed redeemer
+   );
+
+   event EventCancellation(uint256 indexed eventId);
+
+   event EventStaffUpdated(
+    uint256 indexed eventId,
+    address indexed staff,
+    bool authorized
    );
 
 
@@ -136,17 +146,21 @@ constructor() ERC721 ("EventTicket", "EVT") {}
 
    function cancelEvent(uint256 _eventId) public onlyOrganizer(_eventId) {
 
-    if (block.timestamp >= events[_eventId].date) {
-        revert EventAlreadyStarted();
+     if (!events[_eventId].active){
+        revert EventAlreadyCancelled();
     }
-
+     if (block.timestamp >= events[_eventId].date) {
+        revert EventAlreadyStarted();
+     }
     events[_eventId].active = false;
+    emit EventCancellation(_eventId);
    }
 
     function setEventStaff (uint256 _eventId, address _staff, bool _authorized) public
    onlyOrganizer(_eventId)
     {
         eventStaff[_eventId][_staff] = _authorized;
+        emit EventStaffUpdated(_eventId, _staff, _authorized);
    }
 
 
@@ -202,9 +216,12 @@ constructor() ERC721 ("EventTicket", "EVT") {}
     if (ticketRedeemed[_ticketId]) {
         revert TicketAlreadyRedeemed();
     }
-    if (block.timestamp < eventInfo.date) {
-        revert EventNotFinished();  
-        }
+    if(!eventInfo.active){
+        revert EventCancelled();
+    }
+    if(block.timestamp + 2 hours < eventInfo.date) {
+        revert CheckInNotOpen();
+    }
     
     if (block.timestamp > _deadline) {
         revert SignatureExpired();
