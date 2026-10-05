@@ -210,10 +210,13 @@ constructor() ERC721 ("EventTicket", "EVT") {}
         revert SignatureExpired();
     }
 
-    bytes32 messageHash = keccak256 (
+    bytes32 messageHash = keccak256(
         abi.encodePacked(
-            address(this), block.chainid, _ticketId,
-            _deadline
+            address(this),
+            block.chainid,
+            _ticketId,
+            _deadline,
+            redemptionNonce[_ticketId]
         )
     );
 
