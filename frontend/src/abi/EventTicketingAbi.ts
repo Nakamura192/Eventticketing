@@ -211,4 +211,53 @@ export const EventTicketingAbi = [
   ],
   outputs: [],
 },
+  {
+    type: "error",
+    name: "EventAlreadyCancelled",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "CheckInNotOpen",
+    inputs: [],
+  },
+  {
+    type: "error",
+    name: "EventCancelled",
+    inputs: [],
+  },
+  {
+    type: "event",
+    name: "EventCancellation",
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        name: "eventId",
+        type: "uint256",
+      },
+    ],
+  },
+  {
+    type: "event",
+    name: "EventStaffUpdated",
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        name: "eventId",
+        type: "uint256",
+      },
+      {
+        indexed: true,
+        name: "staff",
+        type: "address",
+      },
+      {
+        indexed: false,
+        name: "authorized",
+        type: "bool",
+      },
+    ],
+  },
 ] as const;

@@ -126,7 +126,7 @@ function App() {
           );
         }
       },
-      (errorMessage) => {
+      () => {
         // Ignore continuous "QR code not found" messages.
       }
     );
@@ -1167,7 +1167,7 @@ async function revokeStaff(
 
         <p>
           <strong>Revenue:</strong>{" "}
-          {formatEther(item.event[6] * item.event[8])} ETH
+          {formatEther(BigInt(item.event[6]) * BigInt(item.event[8]))} ETH
         </p>
 
         <p>
