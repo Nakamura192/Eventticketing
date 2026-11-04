@@ -48,6 +48,10 @@ export const EventTicketingAbi = [
         type: "uint256",
       },
       {
+        name: "checkInDeadline",
+        type: "uint256",
+      },
+      {
         name: "ticketPrice",
         type: "uint256",
       },
@@ -126,6 +130,18 @@ export const EventTicketingAbi = [
 },
 {
   type: "function",
+  name: "refundTicket",
+  stateMutability: "nonpayable",
+  inputs: [
+    {
+      name: "_ticketId",
+      type: "uint256",
+    },
+  ],
+  outputs: [],
+},
+{
+  type: "function",
   name: "redeemTicket",
   stateMutability: "nonpayable",
   inputs: [
@@ -176,6 +192,7 @@ export const EventTicketingAbi = [
     { name: "_description", type: "string" },
     { name: "_venue", type: "string" },
     { name: "_date", type: "uint256" },
+    { name: "_checkInDeadline", type: "uint256" },
     { name: "_ticketPrice", type: "uint256" },
     { name: "_maxTickets", type: "uint256" },
   ],
@@ -227,6 +244,16 @@ export const EventTicketingAbi = [
     inputs: [],
   },
   {
+  type: "error",
+  name: "InvalidCheckInDeadline",
+  inputs: [],
+},
+{
+  type: "error",
+  name: "CheckInClosed",
+  inputs: [],
+},
+  {
     type: "event",
     name: "EventCancellation",
     anonymous: false,
@@ -260,4 +287,47 @@ export const EventTicketingAbi = [
       },
     ],
   },
+
+  {
+  type: "event",
+  name: "EventCreated",
+  anonymous: false,
+  inputs: [
+    {
+      indexed: true,
+      name: "eventId",
+      type: "uint256",
+    },
+    {
+      indexed: true,
+      name: "organizer",
+      type: "address",
+    },
+    {
+      indexed: false,
+      name: "name",
+      type: "string",
+    },
+    {
+      indexed: false,
+      name: "date",
+      type: "uint256",
+    },
+    {
+      indexed: false,
+      name: "checkInDeadline",
+      type: "uint256",
+    },
+    {
+      indexed: false,
+      name: "ticketPrice",
+      type: "uint256",
+    },
+    {
+      indexed: false,
+      name: "maxTickets",
+      type: "uint256",
+    },
+  ],
+},
 ] as const;

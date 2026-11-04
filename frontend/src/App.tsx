@@ -21,6 +21,7 @@ function App() {
   const [eventDescription, setEventDescription] = useState("");
   const [eventVenue, setEventVenue] = useState("");
   const [eventDate, setEventDate] = useState("");
+  const [checkInDeadline, setCheckInDeadline] = useState("");
   const [ticketPrice, setTicketPrice] = useState("");
   const [maxTickets, setMaxTickets] = useState("");
   const [staffAddress, setStaffAddress] = useState("");
@@ -182,38 +183,58 @@ function App() {
       return;
     }
 
-    if (
-      !eventName ||
-      !eventDescription ||
-      !eventVenue ||
-      !eventDate ||
-      !ticketPrice ||
-      !maxTickets
-    ) {
-      alert("Please fill in all fields.");
-      return;
-    }
+   if (
+    !eventName ||
+    !eventDescription ||
+    !eventVenue ||
+    !eventDate ||
+    !checkInDeadline ||
+    !ticketPrice ||
+    !maxTickets
+  ) {
+    alert("Please fill in all fields.");
+    return;
+  }
 
-    const walletClient = getWalletClient();
+  const eventDateMs = new Date(eventDate).getTime();
+  const checkInDeadlineMs = new Date(checkInDeadline).getTime();
 
-    const timestamp = BigInt(
-      Math.floor(new Date(eventDate).getTime() / 1000)
-    );
+  if (
+    !Number.isFinite(eventDateMs) ||
+    !Number.isFinite(checkInDeadlineMs)
+  ) {
+    alert("Please enter valid event and check-in dates.");
+    return;
+  }
 
-    const priceInWei = parseEther(ticketPrice);
+  const walletClient = getWalletClient();
+
+  const timestamp = BigInt(Math.floor(eventDateMs / 1000));
+
+  const checkInDeadlineTimestamp = BigInt(
+    Math.floor(checkInDeadlineMs / 1000)
+  );
+
+  if (checkInDeadlineTimestamp <= timestamp) {
+    alert("Check-in deadline must be after the event date and time.");
+    return;
+  }
+
+const priceInWei = parseEther(ticketPrice);
 
     const hash = await walletClient.writeContract({
       address: CONTRACT_ADDRESS,
       abi: EventTicketingAbi,
       functionName: "createEvent",
-      args: [
-        eventName,
-        eventDescription,
-        eventVenue,
-        timestamp,
-        priceInWei,
-        BigInt(maxTickets),
-      ],
+     args: [
+      eventName,
+      eventDescription,
+      eventVenue,
+      timestamp,
+      checkInDeadlineTimestamp,
+      priceInWei,
+      BigInt(maxTickets),
+    ],
       account: account as `0x${string}`,
     });
 
@@ -229,6 +250,7 @@ function App() {
     setEventDescription("");
     setEventVenue("");
     setEventDate("");
+    setCheckInDeadline("");
     setTicketPrice("");
     setMaxTickets("");
 
@@ -276,6 +298,41 @@ function App() {
     alert("Ticket purchase failed. Check the console for details.");
   }
 }
+
+async function requestRefund(ticketId: bigint) {
+  try {
+    if (!account) {
+      alert("Please connect your wallet first.");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch your wallet to Sepolia.");
+      return;
+    }
+
+    const walletClient = getWalletClient();
+
+    const hash = await walletClient.writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: EventTicketingAbi,
+      functionName: "refundTicket",
+      args: [ticketId],
+      account: account as `0x${string}`,
+    });
+
+    alert("Refund transaction submitted. Waiting for confirmation...");
+
+    await publicClient.waitForTransactionReceipt({ hash });
+
+    alert("Refund successful!");
+
+    window.location.reload();
+  } catch (error) {
+    console.error("Refund failed:", error);
+    alert("Refund failed. Check the console for details.");
+  }
+}
  async function loadMyTickets(address: string) {
   try {
     const count = await publicClient.readContract({
@@ -291,12 +348,22 @@ function App() {
     for (let i = 1n; i <= count; i++) {
       console.log("Checking ticket:", i.toString());
 
-      const owner = await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: EventTicketingAbi,
-        functionName: "ownerOf",
-        args: [i],
-      });
+      let owner: `0x${string}`;
+
+      try {
+        owner = await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: EventTicketingAbi,
+          functionName: "ownerOf",
+          args: [i],
+        });
+      } catch (error) {
+        console.log(
+          "Skipping burned or nonexistent ticket:",
+          i.toString()
+        );
+        continue;
+      }
 
       console.log("Ticket owner:", owner);
       console.log("Connected address:", address);
@@ -311,8 +378,6 @@ function App() {
           args: [i],
         });
 
-        console.log("Event ID:", eventId.toString());
-
         const eventData = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
           abi: EventTicketingAbi,
@@ -320,24 +385,23 @@ function App() {
           args: [eventId],
         });
 
-        console.log("Event data:", eventData);
+        const redeemed = await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: EventTicketingAbi,
+          functionName: "ticketRedeemed",
+          args: [i],
+        });
 
-    const redeemed = await publicClient.readContract({
-      address: CONTRACT_ADDRESS,
-      abi: EventTicketingAbi,
-      functionName: "ticketRedeemed",
-      args: [i],
-    });
-
-    ownedTickets.push({
-      ticketId: i,
-      event: eventData,
-      redeemed,
-    });
+        ownedTickets.push({
+          ticketId: i,
+          event: eventData,
+          redeemed,
+        });
       }
     }
 
     setMyTickets(ownedTickets);
+    console.log("My tickets loaded:", ownedTickets);
   } catch (error) {
     console.error("FAILED TO LOAD MY TICKETS:", error);
   }
@@ -615,11 +679,14 @@ async function handleRedemptionInput() {
 
     setRedemptionInput("");
   } catch (error) {
-    console.error("Redemption authorization processing failed:", error);
-    alert(
-      "Invalid redemption authorization. Make sure you pasted the complete authorization."
-    );
-  } finally {
+      console.error("Redemption authorization processing failed:", error);
+      alert(
+        `Authorization processing failed:\n\n${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+   finally {
     setRedemptionLoading(false);
   }
 }
@@ -690,6 +757,10 @@ async function previewRedemptionAuthorization() {
       : false;
 
     const authorized = isOrganizer || isStaff;
+    console.log("Connected account:", account);
+    console.log("Event organizer:", organizer);
+    console.log("Is organizer:", isOrganizer);
+    console.log("Is staff:", isStaff);
 
     const redeemed = await publicClient.readContract({
       address: CONTRACT_ADDRESS,
@@ -735,15 +806,18 @@ async function redeemTicketOnChain(
       return;
     }
 
+   
     const walletClient = getWalletClient();
 
-    const hash = await walletClient.writeContract({
+    const { request } = await publicClient.simulateContract({
       address: CONTRACT_ADDRESS,
       abi: EventTicketingAbi,
       functionName: "redeemTicket",
       args: [ticketId, deadline, signature],
       account: account as `0x${string}`,
     });
+
+    const hash = await walletClient.writeContract(request);
 
     console.log("Redemption transaction submitted:", hash);
 
@@ -754,18 +828,41 @@ async function redeemTicketOnChain(
     alert("Ticket redeemed successfully!");
 
     await loadMyTickets(account);
+ 
   } catch (error: any) {
     console.error("Ticket redemption failed:", error);
 
+    console.log("Error name:", error?.name);
+    console.log("Short message:", error?.shortMessage);
+    console.log("Details:", error?.details);
+    console.log("Cause:", error?.cause);
+    console.log("Error message:", error?.message);
+
     const message =
+      error?.cause?.reason ||
+      error?.cause?.data?.errorName ||
       error?.shortMessage ||
       error?.details ||
       error?.message ||
       "Unknown error";
 
-    alert(`Ticket redemption failed:\n\n${message}`);
+    if (
+      message.includes("EventCancelled") ||
+      message.includes("Event cancelled") ||
+      message.includes("EventAlreadyCancelled")
+    ) {
+      alert("This event has been cancelled. Its tickets cannot be redeemed.");
+    } else if (
+      message.includes("CheckInNotOpen") ||
+      message.includes("Check-in is not open")
+    ) {
+      alert("Check-in is not open yet. Redemption is allowed within two hours of the event.");
+    } else {
+      alert(`Ticket redemption failed:\n\n${message}`);
+    }
   }
 }
+
   async function authorizeStaff(
   eventId: bigint,
   staffAddress: `0x${string}`
@@ -934,12 +1031,23 @@ async function revokeStaff(
         onChange={(e) => setEventVenue(e.target.value)}
       />
 
-      <input
-        type="datetime-local"
-        value={eventDate}
-        onChange={(e) => setEventDate(e.target.value)}
-      />
+     <label>
+        Event Date and Time
+        <input
+          type="datetime-local"
+          value={eventDate}
+          onChange={(e) => setEventDate(e.target.value)}
+        />
+      </label>
 
+      <label>
+        Check-in Deadline
+        <input
+          type="datetime-local"
+          value={checkInDeadline}
+          onChange={(e) => setCheckInDeadline(e.target.value)}
+        />
+      </label>
       <input
         type="number"
         placeholder="Ticket price in ETH"
@@ -1112,8 +1220,8 @@ async function revokeStaff(
   <p>You have not created any events.</p>
 ) : (
   myEvents.map((item) => {
-    const ticketsSold = Number(item.event[8]);
-    const maxTickets = Number(item.event[7]);
+    const ticketsSold = Number(item.event[9]);
+    const maxTickets = Number(item.event[8]);
     const salesPercentage =
       maxTickets > 0 ? (ticketsSold / maxTickets) * 100 : 0;
 
@@ -1131,13 +1239,18 @@ async function revokeStaff(
         </p>
 
         <p>
+          <strong>Check-in Deadline:</strong>{" "}
+          {new Date(Number(item.event[6]) * 1000).toLocaleString()}
+        </p>
+
+        <p>
           <strong>Tickets Sold:</strong>{" "}
-          {item.event[8].toString()} / {item.event[7].toString()}
+          {item.event[9].toString()} / {item.event[8].toString()}
         </p>
 
         <p>
           <strong>Tickets Remaining:</strong>{" "}
-          {(item.event[7] - item.event[8]).toString()}
+          {(item.event[8] - item.event[9]).toString()}
         </p>
 
         <p>
@@ -1167,15 +1280,15 @@ async function revokeStaff(
 
         <p>
           <strong>Revenue:</strong>{" "}
-          {formatEther(BigInt(item.event[6]) * BigInt(item.event[8]))} ETH
+          {formatEther(BigInt(item.event[7]) * BigInt(item.event[9]))} ETH
         </p>
 
         <p>
           <strong>Status:</strong>{" "}
-          {item.event[9] ? "Active" : "Cancelled"}
+          {item.event[10] ? "Active" : "Cancelled"}
         </p>
 
-        {item.event[9] && (
+        {item.event[10] && (
           <>
             <input
               type="text"
@@ -1233,7 +1346,7 @@ async function revokeStaff(
           </>
         )}
 
-        {item.event[9] && (
+        {item.event[10] && (
           <button
             onClick={() => {
               const confirmed = window.confirm(
@@ -1259,7 +1372,7 @@ async function revokeStaff(
               {eventTickets.filter(
                 (ticket) => ticket.eventId === item.eventId
               ).length}{" "}
-              / {item.event[7].toString()}
+              / {item.event[8].toString()}
             </p>
             {eventTickets
               .filter((ticket) => ticket.eventId === item.eventId)
@@ -1327,7 +1440,7 @@ async function revokeStaff(
 
           <p>
             <strong>Price:</strong>{" "}
-            {formatEther(ticket.event[6])} ETH
+            {formatEther(ticket.event[7])} ETH
           </p>
 
           <p>
@@ -1436,6 +1549,13 @@ async function revokeStaff(
     Redeem Ticket
   </button>
 )}
+{!ticket.event[10] && !ticket.redeemed && (
+  <button
+    onClick={() => requestRefund(ticket.ticketId)}
+  >
+    Claim Refund
+  </button>
+)}
 
           <hr />
         </div>
@@ -1465,20 +1585,20 @@ async function revokeStaff(
 
           <p>
             <strong>Ticket Price:</strong>{" "}
-            {formatEther(event[6])} ETH
+            {formatEther(event[7])} ETH
           </p>
 
           <p>
             <strong>Tickets:</strong>{" "}
-            {event[8].toString()} / {event[7].toString()}
+            {event[9].toString()} / {event[8].toString()}
           </p>
           <p>
             <strong>Active:</strong>{" "}
-            {event[9] ? "Yes" : "No"}
+            {event[10] ? "Yes" : "No"}
           </p>
-          {event[9] && (
+          {event[10] && (
   <button
-    onClick={() => buyTicket(event[0], event[6])}
+    onClick={() => buyTicket(event[0], event[7])}
   >
     Buy Ticket
   </button>
