@@ -469,12 +469,19 @@ async function loadEventTickets(events: any[]) {
         continue;
       }
 
-      const owner = await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: EventTicketingAbi,
-        functionName: "ownerOf",
-        args: [i],
-      });
+      let owner: `0x${string}`;
+
+      try {
+        owner = await publicClient.readContract({
+          address: CONTRACT_ADDRESS,
+          abi: EventTicketingAbi,
+          functionName: "ownerOf",
+          args: [i],
+        });
+      } catch (error) {
+        console.log("Skipping burned ticket:", i.toString());
+        continue;
+      }
 
       const redeemed = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
@@ -1361,9 +1368,7 @@ async function revokeStaff(
             Cancel Event
           </button>
         )}
-        {eventTickets.filter(
-          (ticket) => ticket.eventId === item.eventId
-        ).length > 0 && (
+       
           <div>
             <h4>Tickets</h4>
 
@@ -1374,6 +1379,11 @@ async function revokeStaff(
               ).length}{" "}
               / {item.event[8].toString()}
             </p>
+             {eventTickets.filter(
+              (ticket) => ticket.eventId === item.eventId
+            ).length === 0 && (
+              <p>No tickets have been purchased for this event yet.</p>
+            )}
             {eventTickets
               .filter((ticket) => ticket.eventId === item.eventId)
               .map((ticket) => (
@@ -1398,11 +1408,10 @@ async function revokeStaff(
                       <strong>Check-in:</strong> Completed
                     </p>
                   )}
-                </div>
-              ))}
+                   </div>
+                           ))}
           </div>
-        )}
-              </div>
+        </div>
     );
   })
 )}
