@@ -12,6 +12,19 @@ import { QRCodeSVG } from "qrcode.react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 
 function App() {
+  
+  // Theme preference: dark by default
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    const savedTheme = localStorage.getItem("event-ticketing-theme");
+    return savedTheme === "light" ? "light" : "dark";
+  });
+
+  // Apply theme and save preference
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem("event-ticketing-theme", theme);
+  }, [theme]);
+
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [myTickets, setMyTickets] = useState<any[]>([]);
@@ -1013,72 +1026,160 @@ async function revokeStaff(
   return (
     <div>
       
-      <h1>Event Ticketing DApp</h1>
-            <div>
-      <h2>Create Event</h2>
+      <header className="flex flex-col gap-4 border-b border-border px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Event Ticketing
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Decentralized event ticketing on Ethereum
+          </p>
+        </div>
 
-      <input
-        type="text"
-        placeholder="Event name"
-        value={eventName}
-        onChange={(e) => setEventName(e.target.value)}
-      />
+        <div className="flex items-center gap-3">
+          <button
+            className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            onClick={() =>
+              setTheme((current) =>
+                current === "dark" ? "light" : "dark"
+              )
+            }
+          >
+            {theme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode"}
+          </button>
 
-      <input
-        type="text"
-        placeholder="Description"
-        value={eventDescription}
-        onChange={(e) => setEventDescription(e.target.value)}
-      />
+          <button
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            onClick={connectWallet}
+          >
+            Connect Wallet
+          </button>
+        </div>
+      </header>
 
-      <input
-        type="text"
-        placeholder="Venue"
-        value={eventVenue}
-        onChange={(e) => setEventVenue(e.target.value)}
-      />
-
-     <label>
-        Event Date and Time
-        <input
-          type="datetime-local"
-          value={eventDate}
-          onChange={(e) => setEventDate(e.target.value)}
-        />
-      </label>
-
-      <label>
-        Check-in Deadline
-        <input
-          type="datetime-local"
-          value={checkInDeadline}
-          onChange={(e) => setCheckInDeadline(e.target.value)}
-        />
-      </label>
-      <input
-        type="number"
-        placeholder="Ticket price in ETH"
-        value={ticketPrice}
-        onChange={(e) => setTicketPrice(e.target.value)}
-      />
-
-      <input
-        type="number"
-        placeholder="Maximum tickets"
-        value={maxTickets}
-        onChange={(e) => setMaxTickets(e.target.value)}
-      />
-
-      <button onClick={createEvent}>
+<div className="mx-auto mt-8 w-full max-w-3xl px-4">
+  <div className="rounded-2xl border border-border bg-card p-6 shadow-lg sm:p-8">
+    <div className="mb-7">
+      <h2 className="text-2xl font-bold tracking-tight text-card-foreground">
         Create Event
-      </button>
+      </h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Set up your event and configure its ticket details.
+      </p>
     </div>
+
+    <div className="space-y-5">
+      <div>
+        <label className="mb-2 block text-sm font-medium text-card-foreground">
+          Event Name
+        </label>
+        <input
+          type="text"
+          placeholder="e.g. Web3 Innovation Summit"
+          value={eventName}
+          onChange={(e) => setEventName(e.target.value)}
+          className="w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
+        />
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-card-foreground">
+          Description
+        </label>
+        <textarea
+          placeholder="Tell attendees what your event is about..."
+          value={eventDescription}
+          onChange={(e) => setEventDescription(e.target.value)}
+          rows={3}
+          className="w-full resize-y rounded-lg border border-input bg-background px-4 py-3 text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
+        />
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-card-foreground">
+          Venue
+        </label>
+        <input
+          type="text"
+          placeholder="Enter event location"
+          value={eventVenue}
+          onChange={(e) => setEventVenue(e.target.value)}
+          className="w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
+        />
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-card-foreground">
+            Event Date and Time
+          </label>
+          <input
+            type="datetime-local"
+            value={eventDate}
+            onChange={(e) => setEventDate(e.target.value)}
+            className="w-full rounded-lg border border-input bg-background px-3 py-3 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-card-foreground">
+            Check-in Deadline
+          </label>
+          <input
+            type="datetime-local"
+            value={checkInDeadline}
+            onChange={(e) => setCheckInDeadline(e.target.value)}
+            className="w-full rounded-lg border border-input bg-background px-3 py-3 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-card-foreground">
+            Ticket Price (ETH)
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 0.002"
+            value={ticketPrice}
+            onChange={(e) => setTicketPrice(e.target.value)}
+            className="w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-card-foreground">
+            Maximum Tickets
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 100"
+            value={maxTickets}
+            onChange={(e) => setMaxTickets(e.target.value)}
+            className="w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-5">
+        <button
+          onClick={createEvent}
+          className="w-full rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-md transition hover:opacity-90 active:scale-[0.99]"
+        >
+          Create Event
+        </button>
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Your event will be published on the Ethereum network.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
 
     
       
-      <button onClick={connectWallet}>
-  {account ? "Wallet Connected" : "Connect Wallet"}
-</button>
+  
 
 {account && (
   <p>
@@ -1223,400 +1324,692 @@ async function revokeStaff(
       : "Redeem Ticket"}
   </button>
 
+ 
+<div className="mt-10 space-y-6">
+  <div>
+    <h2 className="text-2xl font-bold tracking-tight text-foreground">
+      Organizer Dashboard
+    </h2>
+    <p className="mt-2 text-sm text-muted-foreground">
+      Manage your events, monitor ticket sales and control event staff.
+    </p>
+  </div>
+
   {myEvents.length === 0 ? (
-  <p>You have not created any events.</p>
-) : (
-  myEvents.map((item) => {
-    const ticketsSold = Number(item.event[9]);
-    const maxTickets = Number(item.event[8]);
-    const salesPercentage =
-      maxTickets > 0 ? (ticketsSold / maxTickets) * 100 : 0;
+    <div className="rounded-2xl border border-border bg-card p-10 text-center">
+      <h3 className="text-lg font-semibold text-card-foreground">
+        No events yet
+      </h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        You have not created any events.
+      </p>
+    </div>
+  ) : (
+    <div className="grid gap-6">
+      {myEvents.map((item) => {
+        const ticketsSold = Number(item.event[9]);
+        const maxTickets = Number(item.event[8]);
+        const salesPercentage =
+          maxTickets > 0 ? (ticketsSold / maxTickets) * 100 : 0;
 
-    return (
-      <div key={item.eventId.toString()}>
-        <h3>{item.event[2]}</h3>
+       
 
-        <p>
-          <strong>Venue:</strong> {item.event[4]}
-        </p>
-
-        <p>
-          <strong>Date:</strong>{" "}
-          {new Date(Number(item.event[5]) * 1000).toLocaleString()}
-        </p>
-
-        <p>
-          <strong>Check-in Deadline:</strong>{" "}
-          {new Date(Number(item.event[6]) * 1000).toLocaleString()}
-        </p>
-
-        <p>
-          <strong>Tickets Sold:</strong>{" "}
-          {item.event[9].toString()} / {item.event[8].toString()}
-        </p>
-
-        <p>
-          <strong>Tickets Remaining:</strong>{" "}
-          {(item.event[8] - item.event[9]).toString()}
-        </p>
-
-        <p>
-          <strong>Sales:</strong>{" "}
-          {salesPercentage.toFixed(1)}%
-        </p>
-
-        <div
-          style={{
-            width: "100%",
-            height: "10px",
-            backgroundColor: "#e0e0e0",
-            borderRadius: "5px",
-            overflow: "hidden",
-            marginTop: "5px",
-            marginBottom: "15px",
-          }}
-        >
+        return (
           <div
-            style={{
-              width: `${Math.min(salesPercentage, 100)}%`,
-              height: "100%",
-              backgroundColor: "#4caf50",
-            }}
-          />
-        </div>
+            key={item.eventId.toString()}
+            className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+          >
+            <div className="border-b border-border p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-bold text-card-foreground">
+                    {item.event[2]}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {item.event[4]}
+                  </p>
+                </div>
 
-        <p>
-          <strong>Revenue:</strong>{" "}
-          {formatEther(BigInt(item.event[7]) * BigInt(item.event[9]))} ETH
-        </p>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    item.event[10]
+                      ? "bg-emerald-500/10 text-emerald-500"
+                      : "bg-red-500/10 text-red-500"
+                  }`}
+                >
+                  {item.event[10] ? "Active" : "Cancelled"}
+                </span>
+              </div>
 
-        <p>
-          <strong>Status:</strong>{" "}
-          {item.event[10] ? "Active" : "Cancelled"}
-        </p>
+              <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-muted-foreground">Event Date</p>
+                  <p className="mt-1 font-medium text-card-foreground">
+                    {new Date(
+                      Number(item.event[5]) * 1000
+                    ).toLocaleString()}
+                  </p>
+                </div>
 
-        {item.event[10] && (
-          <>
-            <input
-              type="text"
-              placeholder="Staff wallet address"
-              value={staffAddress}
-              onChange={(e) => setStaffAddress(e.target.value)}
-            />
+                <div>
+                  <p className="text-muted-foreground">Check-in Deadline</p>
+                  <p className="mt-1 font-medium text-card-foreground">
+                    {new Date(
+                      Number(item.event[6]) * 1000
+                    ).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-            <button
-              onClick={() => {
-                if (!staffAddress) {
-                  alert("Please enter a staff wallet address.");
-                  return;
-                }
+            <div className="grid grid-cols-2 gap-4 border-b border-border p-6 sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Tickets Sold</p>
+                <p className="mt-2 text-2xl font-bold text-card-foreground">
+                  {ticketsSold}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  of {maxTickets}
+                </p>
+              </div>
 
-                authorizeStaff(
-                  item.eventId,
-                  staffAddress as `0x${string}`
-                );
-              }}
-            >
-              Authorize Staff
-            </button>
+              <div>
+                <p className="text-xs text-muted-foreground">Remaining</p>
+                <p className="mt-2 text-2xl font-bold text-card-foreground">
+                  {maxTickets - ticketsSold}
+                </p>
+                <p className="text-xs text-muted-foreground">Tickets</p>
+              </div>
 
-            {staffAuthorized[item.eventId.toString()] && (
-              <button
-                onClick={() => {
-                  if (!staffAddress) {
-                    alert("Please enter the staff wallet address.");
-                    return;
-                  }
+              <div>
+                <p className="text-xs text-muted-foreground">Sales Progress</p>
+                <p className="mt-2 text-2xl font-bold text-primary">
+                  {salesPercentage.toFixed(1)}%
+                </p>
+                <p className="text-xs text-muted-foreground">Capacity sold</p>
+              </div>
 
-                  const confirmed = window.confirm(
-                    "Are you sure you want to revoke this staff member's authorization?"
-                  );
+              <div>
+                <p className="text-xs text-muted-foreground">Revenue</p>
+                <p className="mt-2 break-words text-xl font-bold text-card-foreground">
+                  {formatEther(
+                    BigInt(item.event[7]) * BigInt(item.event[9])
+                  )} ETH
+                </p>
+                <p className="text-xs text-muted-foreground">Total sales</p>
+              </div>
+            </div>
 
-                  if (confirmed) {
-                    revokeStaff(
-                      item.eventId,
-                      staffAddress as `0x${string}`
-                    );
-                  }
-                }}
-              >
-                Revoke Staff
-              </button>
+            <div className="border-b border-border p-6">
+              <div className="mb-2 flex justify-between text-sm">
+                <span className="font-medium text-card-foreground">
+                  Ticket Sales
+                </span>
+                <span className="text-muted-foreground">
+                  {salesPercentage.toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-500"
+                  style={{
+                    width: `${Math.min(salesPercentage, 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {item.event[10] && (
+              <div className="space-y-4 border-b border-border p-6">
+                <div>
+                  <h4 className="font-semibold text-card-foreground">
+                    Staff Management
+                  </h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Manage staff members authorized to check in ticket holders.
+                  </p>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Staff wallet address"
+                  value={staffAddress}
+                  onChange={(e) => setStaffAddress(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+                />
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                    onClick={() => {
+                      if (!staffAddress) {
+                        alert("Please enter a staff wallet address.");
+                        return;
+                      }
+
+                      authorizeStaff(
+                        item.eventId,
+                        staffAddress as `0x${string}`
+                      );
+                    }}
+                  >
+                    Authorize Staff
+                  </button>
+
+                  {staffAuthorized[item.eventId.toString()] && (
+                    <button
+                      className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-accent"
+                      onClick={() => {
+                        if (!staffAddress) {
+                          alert("Please enter the staff wallet address.");
+                          return;
+                        }
+
+                        const confirmed = window.confirm(
+                          "Are you sure you want to revoke this staff member's authorization?"
+                        );
+
+                        if (confirmed) {
+                          revokeStaff(
+                            item.eventId,
+                            staffAddress as `0x${string}`
+                          );
+                        }
+                      }}
+                    >
+                      Revoke Staff
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  Staff Status:{" "}
+                  <span
+                    className={`font-semibold ${
+                      staffAuthorized[item.eventId.toString()]
+                        ? "text-emerald-500"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {staffAuthorized[item.eventId.toString()]
+                      ? "Authorized"
+                      : "Not Authorized"}
+                  </span>
+                </p>
+              </div>
             )}
 
-            <p>
-              <strong>Staff Status:</strong>{" "}
-              {staffAuthorized[item.eventId.toString()]
-                ? "Authorized"
-                : "Not Authorized"}
-            </p>
-          </>
-        )}
+            {item.event[10] && (
+              <div className="border-b border-border p-6">
+                <button
+                  className="rounded-lg border border-red-500/40 px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
+                  onClick={() => {
+                    const confirmed = window.confirm(
+                      "Are you sure you want to cancel this event?"
+                    );
 
-        {item.event[10] && (
-          <button
-            onClick={() => {
-              const confirmed = window.confirm(
-                "Are you sure you want to cancel this event?"
-              );
+                    if (confirmed) {
+                      cancelEvent(item.eventId);
+                    }
+                  }}
+                >
+                  Cancel Event
+                </button>
+              </div>
+            )}
 
-              if (confirmed) {
-                cancelEvent(item.eventId);
-              }
-            }}
-          >
-            Cancel Event
-          </button>
-        )}
-       
-          <div>
-            <h4>Tickets</h4>
+            <div className="p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-card-foreground">
+                    Ticket Management
+                  </h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    View issued tickets and their check-in status.
+                  </p>
+                </div>
 
-            <p>
-              <strong>Tickets Issued:</strong>{" "}
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {eventTickets.filter(
+                    (ticket) => ticket.eventId === item.eventId
+                  ).length}{" "}
+                  Issued
+                </span>
+              </div>
+
+              <p className="mb-4 text-sm text-muted-foreground">
+                Tickets Issued:{" "}
+                <span className="font-semibold text-card-foreground">
+                  {eventTickets.filter(
+                    (ticket) => ticket.eventId === item.eventId
+                  ).length}{" "}
+                  / {item.event[8].toString()}
+                </span>
+              </p>
+
               {eventTickets.filter(
                 (ticket) => ticket.eventId === item.eventId
-              ).length}{" "}
-              / {item.event[8].toString()}
-            </p>
-             {eventTickets.filter(
-              (ticket) => ticket.eventId === item.eventId
-            ).length === 0 && (
-              <p>No tickets have been purchased for this event yet.</p>
-            )}
-            {eventTickets
-              .filter((ticket) => ticket.eventId === item.eventId)
-              .map((ticket) => (
-                <div key={ticket.ticketId.toString()}>
-                  <p>
-                    <strong>Ticket #{ticket.ticketId.toString()}</strong>
+              ).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No tickets have been purchased for this event yet.
                   </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {eventTickets
+                    .filter(
+                      (ticket) => ticket.eventId === item.eventId
+                    )
+                    .map((ticket) => (
+                      <div
+                        key={ticket.ticketId.toString()}
+                        className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-background p-4 sm:flex-row sm:items-center"
+                      >
+                        <div>
+                          <p className="font-semibold text-card-foreground">
+                            Ticket #{ticket.ticketId.toString()}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Owner: {ticket.owner.slice(0, 6)}...
+                            {ticket.owner.slice(-4)}
+                          </p>
+                        </div>
 
-                  <p>
-                  <strong>Owner:</strong>{" "}
-                  {ticket.owner.slice(0, 6)}...
-                  {ticket.owner.slice(-4)}
-                </p>
+                        <div>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              ticket.redeemed
+                                ? "bg-emerald-500/10 text-emerald-500"
+                                : "bg-blue-500/10 text-blue-500"
+                            }`}
+                          >
+                            {ticket.redeemed ? "Redeemed" : "Valid"}
+                          </span>
 
-                  <p>
-                    <strong>Status:</strong>{" "}
-                    {ticket.redeemed ? "Redeemed" : "Valid"}
-                  </p>
-
-                  {ticket.redeemed && (
-                    <p>
-                      <strong>Check-in:</strong> Completed
-                    </p>
-                  )}
-                   </div>
-                           ))}
+                          {ticket.redeemed && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Check-in: Completed
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-    );
-  })
-)}
+        );
+      })}
+    </div>
+   )}
+</div>
 </div>
 
 {account && (
   <div>
     <h2>My Tickets</h2>
 
-    {myTickets.length === 0 ? (
-      <p>No tickets found.</p>
-    ) : (
-      myTickets.map((ticket) => (
-        <div key={ticket.ticketId.toString()}>
-          <h3>
-            Ticket #{ticket.ticketId.toString()}
-          </h3>
-
-          <p>
-            <strong>Event:</strong>{" "}
-            {ticket.event[2]}
-          </p>
-
-          <p>
-            <strong>Venue:</strong>{" "}
-            {ticket.event[4]}
-          </p>
-
-          <p>
-            <strong>Date:</strong>{" "}
-            {new Date(
-              Number(ticket.event[5]) * 1000
-            ).toLocaleString()}
-          </p>
-
-          <p>
-            <strong>Price:</strong>{" "}
-            {formatEther(ticket.event[7])} ETH
-          </p>
-
-          <p>
-            <strong>Status:</strong> {ticket.redeemed ? "Redeemed" : "Valid"}
-          </p>
+   
+{myTickets.length === 0 ? (
+  <div className="rounded-2xl border border-border bg-card px-6 py-12 text-center">
+    <div className="mb-3 text-4xl">🎟️</div>
+    <h3 className="text-lg font-semibold text-foreground">
+      No tickets yet
+    </h3>
+    <p className="mt-2 text-sm text-muted-foreground">
+      Tickets you purchase will appear here.
+    </p>
+  </div>
+) : (
+  <div className="grid gap-6 md:grid-cols-2">
+    {myTickets.map((ticket) => (
+      <div
+        key={ticket.ticketId.toString()}
+        className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+      >
+        {/* Ticket header */}
+        <div className="flex items-center justify-between border-b border-border bg-accent/40 p-5">
           <div>
-        Event timestamp: {ticket.event[5].toString()}
-      </div>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Event Ticket
+            </p>
+            <h3 className="mt-1 text-lg font-bold text-foreground">
+              Ticket #{ticket.ticketId.toString()}
+            </h3>
+          </div>
 
-      <div>
-        Current timestamp: {Math.floor(Date.now() / 1000)}
-      </div>
-          <button
-            onClick={async () => {
-              const deadline = BigInt(
-                Math.floor(Date.now() / 1000) + 3600
-              );
-
-              const signature = await generateRedemptionSignature(
-                ticket.ticketId,
-                deadline
-              );
-
-              if (signature) {
-                setTicketRedemptionData((prev) => ({
-                  ...prev,
-                  [ticket.ticketId.toString()]: {
-                    signature,
-                    deadline,
-                  },
-                }));
-              }
-            }}
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              ticket.redeemed
+                ? "bg-muted text-muted-foreground"
+                : "bg-green-500/10 text-green-600"
+            }`}
           >
-            Sign Redemption Authorization
-          </button>
-        
-          {ticketRedemptionData[ticket.ticketId.toString()] && (
-  <button
-    onClick={async () => {
-      const redemptionData =
-        ticketRedemptionData[ticket.ticketId.toString()];
-
-      const authorization = JSON.stringify({
-        ticketId: ticket.ticketId.toString(),
-        deadline: redemptionData.deadline.toString(),
-        signature: redemptionData.signature,
-      });
-
-      await navigator.clipboard.writeText(authorization);
-
-      alert("Redemption authorization copied to clipboard!");
-    }}
-  >
-    Copy Redemption Authorization
-  </button>
-)}
-
-    {ticketRedemptionData[ticket.ticketId.toString()] && (
-      <div style={{ marginTop: "15px" }}>
-        <h4>Redemption QR Code</h4>
-
-        {ticketRedemptionData[ticket.ticketId.toString()] &&
-          (() => {
-            const authorization = [
-              ticket.ticketId.toString(),
-              ticketRedemptionData[ticket.ticketId.toString()].deadline.toString(),
-              ticketRedemptionData[ticket.ticketId.toString()].signature,
-            ].join("|");
-            console.log("QR Authorization Payload:", authorization);
-            console.log("QR Payload Length:", authorization.length);
-            console.log("QR Payload Ends With:", authorization.slice(-20));
-
-            return (
-              <QRCodeSVG
-                value={authorization}
-                size={400}
-              />
-            );
-          })()}
-
-        <p>
-          Show this QR code to event staff for ticket redemption.
-        </p>
-      </div>
-    )}
-
-{!ticket.redeemed && (
-  <button
-    onClick={async () => {
-      const redemptionData =
-        ticketRedemptionData[ticket.ticketId.toString()];
-
-      if (!redemptionData) {
-        alert("Please generate a redemption signature first.");
-        return;
-      }
-
-      await redeemTicketOnChain(
-        ticket.ticketId,
-        redemptionData.deadline,
-        redemptionData.signature
-      );
-    }}
-  >
-    Redeem Ticket
-  </button>
-)}
-{!ticket.event[10] && !ticket.redeemed && (
-  <button
-    onClick={() => requestRefund(ticket.ticketId)}
-  >
-    Claim Refund
-  </button>
-)}
-
-          <hr />
+            {ticket.redeemed ? "Redeemed" : "Valid"}
+          </span>
         </div>
-      ))
-    )}
+
+        {/* Event information */}
+        <div className="space-y-4 p-5">
+          <div>
+            <h4 className="text-xl font-bold text-foreground">
+              {ticket.event[2]}
+            </h4>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {ticket.event[4]}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Event Date</p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {new Date(
+                  Number(ticket.event[5]) * 1000
+                ).toLocaleString()}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground">Ticket Price</p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {formatEther(ticket.event[7])} ETH
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-border pt-4">
+            <p className="mb-3 text-sm font-semibold text-foreground">
+              Ticket Actions
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {!ticket.redeemed && (
+                <button
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                  onClick={async () => {
+                    const deadline = BigInt(
+                      Math.floor(Date.now() / 1000) + 3600
+                    );
+
+                    const signature = await generateRedemptionSignature(
+                      ticket.ticketId,
+                      deadline
+                    );
+
+                    if (signature) {
+                      setTicketRedemptionData((prev) => ({
+                        ...prev,
+                        [ticket.ticketId.toString()]: {
+                          signature,
+                          deadline,
+                        },
+                      }));
+                    }
+                  }}
+                >
+                  Sign Authorization
+                </button>
+              )}
+
+              {!ticket.event[10] && !ticket.redeemed && (
+                <button
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                  onClick={() => requestRefund(ticket.ticketId)}
+                >
+                  Claim Refund
+                </button>
+              )}
+            </div>
+
+            {ticketRedemptionData[ticket.ticketId.toString()] && (
+              <div className="mt-5 space-y-4 rounded-xl border border-border bg-background p-4">
+                <h4 className="font-semibold text-foreground">
+                  Redemption Authorization
+                </h4>
+
+                <button
+                  className="w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+                  onClick={async () => {
+                    const redemptionData =
+                      ticketRedemptionData[ticket.ticketId.toString()];
+
+                    const authorization = JSON.stringify({
+                      ticketId: ticket.ticketId.toString(),
+                      deadline: redemptionData.deadline.toString(),
+                      signature: redemptionData.signature,
+                    });
+
+                    await navigator.clipboard.writeText(authorization);
+
+                    alert("Redemption authorization copied to clipboard!");
+                  }}
+                >
+                  Copy Authorization
+                </button>
+
+                <div className="flex flex-col items-center rounded-xl bg-white p-4">
+                  <h4 className="mb-3 text-sm font-semibold text-gray-900">
+                    Redemption QR Code
+                  </h4>
+
+                  {(() => {
+                    const authorization = [
+                      ticket.ticketId.toString(),
+                      ticketRedemptionData[ticket.ticketId.toString()].deadline.toString(),
+                      ticketRedemptionData[ticket.ticketId.toString()].signature,
+                    ].join("|");
+
+                    return (
+                      <QRCodeSVG
+                        value={authorization}
+                        size={250}
+                      />
+                    );
+                  })()}
+
+                  <p className="mt-3 text-center text-xs text-gray-600">
+                    Show this QR code to event staff for ticket redemption.
+                  </p>
+                </div>
+
+                {!ticket.redeemed && (
+                  <button
+                    className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                    onClick={async () => {
+                      const redemptionData =
+                        ticketRedemptionData[ticket.ticketId.toString()];
+
+                      if (!redemptionData) {
+                        alert("Please generate a redemption signature first.");
+                        return;
+                      }
+
+                      await redeemTicketOnChain(
+                        ticket.ticketId,
+                        redemptionData.deadline,
+                        redemptionData.signature
+                      );
+                    }}
+                  >
+                    Redeem Ticket
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    ))}
   </div>
 )}
-      <p>
-        Events created:{" "}
-        {eventCount !== null ? eventCount.toString() : "Loading..."}
-      </p>
-
-      {events.map((event) => (
-        <div key={event[0].toString()}>
-          <h2>{event[2]}</h2>
-
-          <p>{event[3]}</p>
-
-          <p>
-            <strong>Venue:</strong> {event[4]}
-          </p>
-
-          <p>
-            <strong>Date:</strong>{" "}
-            {new Date(Number(event[5]) * 1000).toLocaleString()}
-          </p>
-
-          <p>
-            <strong>Ticket Price:</strong>{" "}
-            {formatEther(event[7])} ETH
-          </p>
-
-          <p>
-            <strong>Tickets:</strong>{" "}
-            {event[9].toString()} / {event[8].toString()}
-          </p>
-          <p>
-            <strong>Active:</strong>{" "}
-            {event[10] ? "Yes" : "No"}
-          </p>
-          {event[10] && (
-  <button
-    onClick={() => buyTicket(event[0], event[7])}
-  >
-    Buy Ticket
-  </button>
+</div>
 )}
-          <hr />
-        </div>
-      ))}
-    </div>
-  );
-}
 
+ 
+      
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              Explore Events
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Discover events and secure your tickets on Ethereum.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+            Events created:{" "}
+            <span className="font-semibold text-foreground">
+              {eventCount !== null ? eventCount.toString() : "Loading..."}
+            </span>
+          </div>
+        </div>
+
+        {events.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card px-6 py-12 text-center">
+            <div className="mb-3 text-4xl">🎟️</div>
+            <h3 className="text-lg font-semibold text-foreground">
+              No events available
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Newly created events will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {events.map((event) => {
+              const ticketsSold = Number(event[9]);
+              const maxTickets = Number(event[8]);
+
+              const salesPercentage =
+                maxTickets > 0
+                  ? Math.min((ticketsSold / maxTickets) * 100, 100)
+                  : 0;
+
+              const ticketsRemaining = Math.max(
+                maxTickets - ticketsSold,
+                0
+              );
+
+              return (
+                <div
+                  key={event[0].toString()}
+                  className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="flex items-center justify-between border-b border-border bg-accent/40 px-5 py-4">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Event #{event[0].toString()}
+                    </span>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        event[10]
+                          ? "bg-green-500/10 text-green-600"
+                          : "bg-red-500/10 text-red-600"
+                      }`}
+                    >
+                      {event[10] ? "Active" : "Cancelled"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-5">
+                    <h3 className="text-xl font-bold text-foreground">
+                      {event[2]}
+                    </h3>
+
+                    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                      {event[3]}
+                    </p>
+
+                    <div className="mt-5 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span>📍</span>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Venue
+                          </p>
+                          <p className="text-sm font-medium text-foreground">
+                            {event[4]}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <span>📅</span>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Event Date
+                          </p>
+                          <p className="text-sm font-medium text-foreground">
+                            {new Date(
+                              Number(event[5]) * 1000
+                            ).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 rounded-xl bg-accent/40 p-4">
+                      <p className="text-xs text-muted-foreground">
+                        Ticket Price
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-primary">
+                        {formatEther(event[7])} ETH
+                      </p>
+                    </div>
+
+                    <div className="mt-5">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground">
+                          Ticket Sales
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {ticketsSold} / {maxTickets}
+                        </span>
+                      </div>
+
+                      <div className="h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${salesPercentage}%` }}
+                        />
+                      </div>
+
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {ticketsRemaining} tickets remaining
+                      </p>
+                    </div>
+
+                    <div className="mt-auto pt-6">
+                      {event[10] ? (
+                        <button
+                          onClick={() =>
+                            buyTicket(event[0], event[7])
+                          }
+                          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                        >
+                          Buy Ticket
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="w-full cursor-not-allowed rounded-lg bg-muted px-4 py-3 text-sm font-semibold text-muted-foreground"
+                        >
+                          Event Cancelled
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+</div>
+  )}
 export default App;
